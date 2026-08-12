@@ -313,13 +313,22 @@ with tab4:
     df_edit = get_gs_data()
 
     if not df_edit.empty:
-        if edit_cat == "수입상":
-            df_edit_filtered = df_edit[df_edit["category"] == "수입상"]
-        elif edit_cat == "합판상":
-            df_edit_filtered = df_edit[df_edit["category"] == "합판상"]
-        else:
-            df_edit_filtered = df_edit
+        # 단가(price) 데이터타입을 정수형(int) 숫자로 확실하게 변환
+        if "price" in df_edit.columns:
+            df_edit["price"] = pd.to_numeric(
+                df_edit["price"].astype(str).str.replace("원", "").str.replace(",", "").str.strip(), 
+                errors="coerce"
+            ).fillna(0).astype(int)
 
+        # 카테고리 필터링
+        if edit_cat == "수입상":
+            df_edit_filtered = df_edit[df_edit["category"] == "수입상"].copy()
+        elif edit_cat == "합판상":
+            df_edit_filtered = df_edit[df_edit["category"] == "합판상"].copy()
+        else:
+            df_edit_filtered = df_edit.copy()
+
+        # 데이터 에디터 출력 (컬럼명 한글 표시 및 숫자 전용 편집 적용)
         edited_df = st.data_editor(
             df_edit_filtered,
             num_rows="dynamic",
@@ -339,7 +348,6 @@ with tab4:
 
         with btn_col1:
             if st.button("💾 구글 시트에 수정사항 반영하기", type="primary"):
-                # 전체 데이터를 관리하기 위해 선택된 카테고리 외 기존 데이터와 병합 후 저장
                 if edit_cat == "전체 데이터":
                     final_df = edited_df
                 else:
@@ -362,4 +370,4 @@ with tab4:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
     else:
-        st.info("수정/관리할 데이터가 없습니다. 먼저 [📁 엑셀 일괄 등록] 탭에서 데이터를 등록해 주세요.")
+        st.info("수정/관리할 데이터가 없습니다.")
