@@ -313,14 +313,21 @@ with tab4:
     df_edit = get_gs_data()
 
     if not df_edit.empty:
-        # 1. 단가(price)를 정수형(int) 숫자로 타입 변환
+        # 1. 컬럼명 표준화 ('비고' -> 'remark' 로 통일)
+        df_edit = df_edit.rename(columns={"비고": "remark", "구분": "category", "품목군": "item_type", "규격/자재명": "name", "단가": "price"})
+
+        # 2. 비고(remark) 열의 빈값(NaN) 처리 및 문자열 타입 강제
+        if "remark" in df_edit.columns:
+            df_edit["remark"] = df_edit["remark"].fillna("").astype(str)
+
+        # 3. 단가(price)를 정수형(int) 숫자로 변환
         if "price" in df_edit.columns:
             df_edit["price"] = pd.to_numeric(
                 df_edit["price"].astype(str).str.replace("원", "").str.replace(",", "").str.strip(), 
                 errors="coerce"
             ).fillna(0).astype(int)
 
-        # 2. 카테고리 필터링 및 인덱스 재정렬 (reset_index)
+        # 4. 카테고리 필터링 및 인덱스 재정렬
         if edit_cat == "수입상":
             df_edit_filtered = df_edit[df_edit["category"] == "수입상"].copy().reset_index(drop=True)
         elif edit_cat == "합판상":
@@ -328,7 +335,7 @@ with tab4:
         else:
             df_edit_filtered = df_edit.copy().reset_index(drop=True)
 
-        # 3. 데이터 에디터 (disabled=False 명시적 지정)
+        # 5. 데이터 에디터 출력
         edited_df = st.data_editor(
             df_edit_filtered,
             num_rows="dynamic",
@@ -338,10 +345,10 @@ with tab4:
                 "item_type": st.column_config.TextColumn("품목군"),
                 "name": st.column_config.TextColumn("규격/자재명", required=True),
                 "price": st.column_config.NumberColumn("단가 (원)", format="%d 원", step=500, required=True),
-                "remark": st.column_config.TextColumn("비고"),
+                "remark": st.column_config.TextColumn("비고", disabled=False),  # 수정 가능 명시
             },
             hide_index=True,
-            key=f"gs_editor_{edit_cat}"  # 필터 변경 시 에디터 상태를 리셋하기 위한 유니크 키
+            key=f"gs_editor_{edit_cat}"
         )
 
         btn_col1, btn_col2 = st.columns([1, 4])
