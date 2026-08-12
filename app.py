@@ -9,19 +9,30 @@ if "cart" not in st.session_state:
     st.session_state.cart = []
 
 # ---------------------------------------------------------
-# 📌 구글 시트 커넥션 설정
+# 📌 구글 시트 커넥션 & 캐시(3번) + 전처리(2번) 적용
 # ---------------------------------------------------------
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
+@st.cache_data(ttl=300)  # 3번 적용: 5분(300초) 동안 데이터를 메모리에 보관 (속도 대폭 상승)
 def get_gs_data():
-    """구글 시트 최신 데이터 읽기"""
-    df = conn_gs.read(ttl=0)
-    return df.fillna("")
+    """구글 시트 최신 데이터 읽기 & 사전 정제"""
+    df = conn_gs.read(ttl=0).fillna("")
+    
+    # 2번 적용: 가격(price) 데이터 사전 정제 (검색할 때 매번 변환하지 않도록 미리 숫자로 변환)
+    if not df.empty and "price" in df.columns:
+        df["price_num"] = pd.to_numeric(
+            df["price"].astype(str).str.replace("원", "").str.replace(",", "").str.strip(),
+            errors="coerce"
+        ).fillna(0).astype(int)
+    else:
+        df["price_num"] = 0
+        
+    return df
 
 def save_gs_data(df):
     """구글 시트에 데이터 덮어쓰기 저장"""
     conn_gs.update(data=df)
-    st.cache_data.clear()
+    st.cache_data.clear()  # 저장 후엔 캐시를 지워서 최신 데이터가 바로 반영되게 함
 
 # ---------------------------------------------------------
 # 1. 원드라이브 설정 & 변환 함수
@@ -177,12 +188,21 @@ with tab0:
         else:
             st.info("건축자재 데이터가 없습니다.")
 
+    
 # --- [탭 1] 단가 검색 및 담기 ---
 with tab1:
-    st.subheader("🔎 자재 단가 조회 & 장바구니 담기")
+    col_t1, col_t2 = st.columns([3, 1])
+    with col_t1:
+        st.subheader("🔎 자재 단가 조회 & 장바구니 담기")
+    with col_t2:
+        # 3번 보완: 클릭 시 캐시를 지우고 구글 시트에서 최신 데이터를 새로 들고 옴
+        if st.button("🔄 단가표 즉시 새로고침", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
 
     df_gs = get_gs_data()
-
+    # ... (이하 기존 검색 및 장바구니 로직 동일)
+    
     if not df_gs.empty:
 # 검색 폼으로 감싸서 타자 칠 때마다 재실행되는 현상 방지
         with st.form("search_form"):
