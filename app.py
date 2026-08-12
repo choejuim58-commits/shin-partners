@@ -385,6 +385,8 @@ with tab3:
                 
                 df_new = pd.DataFrame(new_rows)
                 df_updated = pd.concat([df_current, df_new], ignore_index=True)
+
+                df_updated = df_updated.sort_values(by=["category", "item_type", "name"]).reset_index(drop=True)
                 
                 save_gs_data(df_updated)
                 st.success(f"총 {len(new_rows)}개의 [{target_category}] 단가가 성공적으로 구글 시트에 등록되었습니다!")
@@ -417,6 +419,8 @@ with tab4:
             }])
             
             df_updated = pd.concat([df_current, new_data], ignore_index=True)
+
+            df_updated = df_updated.sort_values(by=["category", "item_type", "name"]).reset_index(drop=True)
             save_gs_data(df_updated)
             
             st.success(f"[{f_cat}] '{f_name}' 단가가 구글 시트에 성공적으로 저장되었습니다!")
@@ -485,6 +489,8 @@ with tab5:
                 else:
                     other_df = df_edit[df_edit["category"] != edit_cat]
                     final_df = pd.concat([other_df, edited_df], ignore_index=True)
+
+                final_df = final_df.sort_values(by=["category", "item_type", "name"]).reset_index(drop=True)
 
                 save_gs_data(final_df)
                 st.success("✅ 구글 시트에 수정사항이 성공적으로 반영되었습니다!")
