@@ -184,18 +184,25 @@ with tab1:
     df_gs = get_gs_data()
 
     if not df_gs.empty:
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            category_filter = st.selectbox(
-                "조회할 단가표 선택",
-                ["전체 (비교해서 보기)", "수입상 단가만", "합판상 단가만"],
-                key="tab1_cat_select"
-            )
-        with col2:
-            search_kw = st.text_input(
-                "자재명 또는 규격 검색 (예: 멀바우, MDF, OSB, 1220x2440)",
-                key="tab1_search_kw"
-            )
+# 검색 폼으로 감싸서 타자 칠 때마다 재실행되는 현상 방지
+        with st.form("search_form"):
+            col1, col2, col3 = st.columns([2, 3, 1])
+            with col1:
+                category_filter = st.selectbox(
+                    "조회할 단가표 선택",
+                    ["전체 (비교해서 보기)", "수입상 단가만", "합판상 단가만"],
+                    key="tab1_cat_select"
+                )
+            with col2:
+                search_kw = st.text_input(
+                    "자재명/규격 입력 후 Enter",
+                    placeholder="예: 멀바우, MDF, OSB...",
+                    key="tab1_search_kw"
+                )
+            with col3:
+                st.write("") # 버튼 위치 맞춤용 여백
+                st.write("")
+                search_submitted = st.form_submit_button("🔍 검색", use_container_width=True)
 
         # 데이터 필터링
         df_filtered = df_gs.copy()
