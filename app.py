@@ -104,9 +104,11 @@ st.set_page_config(
 )
 st.title("📦 수입상 vs 합판상 단가 & 원드라이브 수량 통합 시스템")
 
-tab0, tab1, tab2, tab3, tab4 = st.tabs([
+# 탭 구성에 장바구니(tab2) 추가
+tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🌐 원드라이브 실시간 수량",
-    "🔎 단가 검색 & 장바구니", 
+    "🔎 단가 검색 및 담기",
+    f"🧺 장바구니 ({len(st.session_state.cart)}개)",
     "📁 엑셀 일괄 등록", 
     "✏️ 개별 수동 등록", 
     "🛠️ 데이터 직접 수정/삭제"
@@ -175,81 +177,70 @@ with tab0:
         else:
             st.info("건축자재 데이터가 없습니다.")
 
-# --- [탭 1] 단가 검색 및 장바구니 ---
+# --- [탭 1] 단가 검색 및 담기 ---
 with tab1:
     st.subheader("🔎 자재 단가 조회 & 장바구니 담기")
 
     df_gs = get_gs_data()
 
     if not df_gs.empty:
-        # 좌우 2분할 (왼쪽: 단가 조회 및 선택, 오른쪽: 장바구니 및 총액)
-        col_left, col_right = st.columns([3, 2])
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            category_filter = st.selectbox(
+                "조회할 단가표 선택",
+                ["전체 (비교해서 보기)", "수입상 단가만", "합판상 단가만"],
+                key="tab1_cat_select"
+            )
+        with col2:
+            search_kw = st.text_input(
+                "자재명 또는 규격 검색 (예: 멀바우, MDF, OSB, 1220x2440)",
+                key="tab1_search_kw"
+            )
 
-        with col_left:
-            st.markdown("#### 📋 단가표 검색 & 담기")
-            
-            f_col1, f_col2 = st.columns([1, 2])
-            with f_col1:
-                category_filter = st.selectbox(
-                    "구분 선택",
-                    ["전체 (비교해서 보기)", "수입상 단가만", "합판상 단가만"],
-                    key="tab1_cat_select"
-                )
-            with f_col2:
-                search_kw = st.text_input(
-                    "자재명/규격 검색",
-                    placeholder="예: 멀바우, MDF, OSB...",
-                    key="tab1_search_kw"
-                )
+        # 데이터 필터링
+        df_filtered = df_gs.copy()
+        if category_filter == "수입상 단가만":
+            df_filtered = df_filtered[df_filtered["category"] == "수입상"]
+        elif category_filter == "합판상 단가만":
+            df_filtered = df_filtered[df_filtered["category"] == "합판상"]
 
-            # 데이터 필터링
-            df_filtered = df_gs.copy()
-            if category_filter == "수입상 단가만":
-                df_filtered = df_filtered[df_filtered["category"] == "수입상"]
-            elif category_filter == "합판상 단가만":
-                df_filtered = df_filtered[df_filtered["category"] == "합판상"]
+        if search_kw:
+            mask = (
+                df_filtered["name"].astype(str).str.contains(search_kw, case=False) |
+                df_filtered["item_type"].astype(str).str.contains(search_kw, case=False)
+            )
+            df_filtered = df_filtered[mask]
 
-            if search_kw:
-                mask = (
-                    df_filtered["name"].astype(str).str.contains(search_kw, case=False) |
-                    df_filtered["item_type"].astype(str).str.contains(search_kw, case=False)
-                )
-                df_filtered = df_filtered[mask]
+        if not df_filtered.empty:
+            df_filtered["price_num"] = pd.to_numeric(
+                df_filtered["price"].astype(str).str.replace("원", "").str.replace(",", "").str.strip(),
+                errors="coerce"
+            ).fillna(0).astype(int)
 
-            if not df_filtered.empty:
-                # 숫자 변환 및 인덱스 정리
-                df_filtered["price_num"] = pd.to_numeric(
-                    df_filtered["price"].astype(str).str.replace("원", "").str.replace(",", "").str.strip(),
-                    errors="coerce"
-                ).fillna(0).astype(int)
-
-                # 선택 및 수량 입력 영역
-                st.markdown("---")
-                item_options = df_filtered.index.tolist()
+            # 상단에 장바구니 선택 박스 배치
+            with st.expander("🛒 선택한 품목 장바구니에 바로 담기", expanded=True):
+                c_sel, c_qty, c_btn = st.columns([3, 1, 1])
                 
-                def format_item(idx):
-                    row = df_filtered.loc[idx]
-                    return f"[{row['category']}] {row['item_type']} | {row['name']} ({row['price_num']:,}원)"
-
-                selected_idx = st.selectbox("🛒 장바구니에 담을 품목 선택", options=item_options, format_func=format_item)
+                with c_sel:
+                    item_options = df_filtered.index.tolist()
+                    def format_item(idx):
+                        row = df_filtered.loc[idx]
+                        return f"[{row['category']}] {row['item_type']} | {row['name']} ({row['price_num']:,}원)"
+                    
+                    selected_idx = st.selectbox("담을 품목 선택", options=item_options, format_func=format_item, label_visibility="collapsed")
                 
-                qty_col1, qty_col2 = st.columns([1, 2])
-                with qty_col1:
-                    add_qty = st.number_input("수량(개)", min_value=1, value=1, step=1, key="add_qty_input")
-                with qty_col2:
-                    st.write("")
-                    st.write("")
-                    if st.button("➕ 장바구니에 담기", type="primary"):
+                with c_qty:
+                    add_qty = st.number_input("수량", min_value=1, value=1, step=1, label_visibility="collapsed")
+                
+                with c_btn:
+                    if st.button("🛒 담기", type="primary", use_container_width=True):
                         target_row = df_filtered.loc[selected_idx]
-                        
-                        # 이미 담겨있는지 확인 후 수량만 누적
                         exists = False
                         for c in st.session_state.cart:
                             if c["category"] == target_row["category"] and c["name"] == target_row["name"]:
                                 c["qty"] += add_qty
                                 exists = True
                                 break
-                        
                         if not exists:
                             st.session_state.cart.append({
                                 "category": target_row["category"],
@@ -258,67 +249,74 @@ with tab1:
                                 "price": target_row["price_num"],
                                 "qty": add_qty
                             })
-                        st.toast(f"✅ '{target_row['name']}' {add_qty}개가 담겼습니다!", icon="🛒")
+                        st.toast(f"✅ '{target_row['name']}' {add_qty}개가 장바구니에 담겼습니다!", icon="🛒")
                         st.rerun()
 
-                st.markdown("---")
-                
-                # 보여주기용 표 가공
-                df_display = df_filtered.copy()
-                df_display["price"] = df_display["price_num"].apply(lambda x: f"{x:,} 원")
-                df_display = df_display.rename(columns={"category": "구분", "item_type": "품목군", "name": "규격/자재명", "price": "단가", "remark": "비고"})
-                cols_to_show = [c for c in ["구분", "품목군", "규격/자재명", "단가", "비고"] if c in df_display.columns]
-                st.dataframe(df_display[cols_to_show], use_container_width=True, hide_index=True)
-            else:
-                st.info("검색된 데이터가 없습니다.")
-
-        with col_right:
-            st.markdown("#### 🧺 내가 담은 자재 목록")
-
-            if st.session_state.cart:
-                cart_df = pd.DataFrame(st.session_state.cart)
-                cart_df["total_price"] = cart_df["price"] * cart_df["qty"]
-
-                # 테이블 출력용 데이터프레임
-                disp_cart = cart_df[["category", "name", "price", "qty", "total_price"]].copy()
-                disp_cart["price"] = disp_cart["price"].apply(lambda x: f"{x:,}원")
-                disp_cart["total_price"] = disp_cart["total_price"].apply(lambda x: f"{x:,}원")
-                disp_cart.columns = ["구분", "자재명", "단가", "수량", "금액"]
-
-                st.dataframe(disp_cart, use_container_width=True, hide_index=True)
-
-                # 총 금액 계산
-                total_sum = (cart_df["price"] * cart_df["qty"]).sum()
-                st.metric("💳 총 예상 견적 금액", f"{total_sum:,} 원")
-
-                btn_c1, btn_c2 = st.columns(2)
-                with btn_c1:
-                    if st.button("🗑️ 전체 비우기"):
-                        st.session_state.cart = []
-                        st.rerun()
-
-                with btn_c2:
-                    # 엑셀 다운로드
-                    excel_cart = cart_df[["category", "item_type", "name", "price", "qty", "total_price"]].copy()
-                    excel_cart.columns = ["구분", "품목군", "규격/자재명", "단가(원)", "수량", "합계금액(원)"]
-                    
-                    buffer = io.BytesIO()
-                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                        excel_cart.to_excel(writer, index=False, sheet_name="선택자재_견적서")
-                    
-                    st.download_button(
-                        label="📥 견적서 엑셀 다운로드",
-                        data=buffer.getvalue(),
-                        file_name="선택자재_견적목록.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-            else:
-                st.info("💡 장바구니가 비어 있습니다.\n왼쪽에서 품목을 검색하고 [➕ 장바구니에 담기]를 눌러보세요!")
+            # 단가표 출력
+            df_show = df_filtered.copy()
+            df_show["price"] = df_show["price_num"].apply(lambda x: f"{x:,} 원")
+            rename_map = {"category": "구분", "item_type": "품목군", "name": "규격/자재명", "price": "단가", "remark": "비고"}
+            df_show = df_show.rename(columns=rename_map)
+            
+            st.dataframe(df_show[["구분", "품목군", "규격/자재명", "단가", "비고"]], use_container_width=True, hide_index=True)
+        else:
+            st.info("검색된 데이터가 없습니다.")
     else:
         st.info("구글 시트에 등록된 데이터가 없습니다.")
 
-# --- [탭 2] 엑셀 일괄 등록 ---
+# --- [탭 2] 장바구니 및 견적서 확인 ---
 with tab2:
+    st.subheader("🧺 내가 담은 자재 목록 & 예상 견적")
+
+    if st.session_state.cart:
+        cart_df = pd.DataFrame(st.session_state.cart)
+        cart_df["total_price"] = cart_df["price"] * cart_df["qty"]
+
+        # 상단 요약 정보 카드로 시각화
+        total_sum = cart_df["total_price"].sum()
+        total_count = cart_df["qty"].sum()
+        
+        m1, m2, m3 = st.columns(3)
+        m1.metric("선택한 자재 종류", f"{len(cart_df)}종")
+        m2.metric("총 선택 수량", f"{total_count:,} 개")
+        m3.metric("💳 총 예상 견적 금액", f"{total_sum:,} 원")
+
+        st.markdown("---")
+
+        # 테이블 표시
+        disp_cart = cart_df[["category", "item_type", "name", "price", "qty", "total_price"]].copy()
+        disp_cart["price"] = disp_cart["price"].apply(lambda x: f"{x:,}원")
+        disp_cart["total_price"] = disp_cart["total_price"].apply(lambda x: f"{x:,}원")
+        disp_cart.columns = ["구분", "품목군", "자재명/규격", "단가", "수량", "합계금액"]
+
+        st.dataframe(disp_cart, use_container_width=True, hide_index=True)
+
+        col_b1, col_b2, _ = st.columns([1, 1, 2])
+        with col_b1:
+            if st.button("🗑️ 장바구니 전체 비우기", use_container_width=True):
+                st.session_state.cart = []
+                st.rerun()
+
+        with col_b2:
+            excel_cart = cart_df[["category", "item_type", "name", "price", "qty", "total_price"]].copy()
+            excel_cart.columns = ["구분", "품목군", "규격/자재명", "단가(원)", "수량", "합계금액(원)"]
+            
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                excel_cart.to_excel(writer, index=False, sheet_name="선택자재_견적서")
+            
+            st.download_button(
+                label="📥 견적 내역 엑셀 받기",
+                data=buffer.getvalue(),
+                file_name="선택자재_견적목록.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+    else:
+        st.info("💡 장바구니가 비어 있습니다.\n[🔎 단가 검색 및 담기] 탭에서 원하는 품목을 담아보세요!")
+
+# --- [탭 3] 엑셀 일괄 등록 ---
+with tab3:
     st.subheader("📁 엑셀(.xlsx) 파일 업로드")
 
     target_category = st.radio(
@@ -368,8 +366,8 @@ with tab2:
         except Exception as e:
             st.error(f"등록 실패: 엑셀 파일 열 이름을 확인해 주세요. ({e})")
 
-# --- [탭 3] 개별 수동 등록 ---
-with tab3:
+# --- [탭 4] 개별 수동 등록 ---
+with tab4:
     st.subheader("✏️ 자재 하나씩 직접 입력")
     with st.form("manual_form"):
         f_cat = st.selectbox("단가 구분", ["수입상", "합판상"])
@@ -399,8 +397,8 @@ with tab3:
         else:
             st.error("규격과 단가를 꼭 입력해 주세요.")
 
-# --- [탭 4] 데이터 직접 수정 및 삭제 ---
-with tab4:
+# --- [탭 5] 데이터 직접 수정 및 삭제 ---
+with tab5:
     st.subheader("🛠️ 구글 시트 데이터 직접 수정 & 삭제")
     st.caption("💡 셀을 더블클릭하여 금액/텍스트를 수정하거나 행을 선택하여 삭제할 수 있습니다.")
 
@@ -477,4 +475,5 @@ with tab4:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
     else:
+        st.info("수정/관리할 데이터가 없습니다.")
         st.info("수정/관리할 데이터가 없습니다.")
