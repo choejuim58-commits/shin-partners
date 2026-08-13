@@ -11,7 +11,7 @@ if "cart" not in st.session_state:
     st.session_state.cart = []
 
 # ---------------------------------------------------------
-# 📌 구글 시트 커넥션 & 데이터 로드 함수 (2번, 3번 적용)
+# 📌 구글 시트 커넥션 & 데이터 로드 함수
 # ---------------------------------------------------------
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
@@ -30,7 +30,6 @@ def get_gs_data():
 
 def save_gs_data(df):
     """구글 시트에 데이터 덮어쓰기 저장"""
-    # 저장 전 '구분' -> '품목군' -> '규격/자재명' 순 자동 정렬
     if not df.empty:
         sort_cols = [c for c in ["category", "item_type", "name"] if c in df.columns]
         if sort_cols:
@@ -170,7 +169,7 @@ with tab0:
         if not df_building.empty:
             st.dataframe(df_building.style.pipe(apply_excel_style), use_container_width=True, hide_index=True)
 
-# --- [탭 1] 단가 검색 및 담기 (버그 완전 수정 & 인덴트 오류 해결!) ---
+# --- [탭 1] 단가 검색 및 담기 ---
 with tab1:
     col_t1, col_t2 = st.columns([3, 1])
     with col_t1:
@@ -222,8 +221,7 @@ with tab1:
             with st.expander("🛒 선택한 품목 장바구니에 바로 담기", expanded=True):
                 c_sel, c_qty, c_btn = st.columns([3, 1, 1])
 
-                # 💡 [핵심 해결책] 문자열 Key 리스트를 만들어 Selectbox 꼬임 현상 완벽 방지
-                # 형식: "구분 | 품목군 | 자재명 (단가원)"
+                # 💡 문자열 Key 리스트 생성으로 Selectbox 오류 방지
                 df_filtered["select_key"] = (
                     df_filtered["category"].astype(str) + " | " +
                     df_filtered["item_type"].astype(str) + " | " +
@@ -245,7 +243,6 @@ with tab1:
 
                 with c_btn:
                     if st.button("🛒 담기", type="primary", use_container_width=True):
-                        # 선택된 문자열 Key로 해당 행(Row) 정밀 검색
                         target_row = df_filtered[df_filtered["select_key"] == selected_key].iloc[0]
                         
                         target_cat = str(target_row["category"])
@@ -279,18 +276,6 @@ with tab1:
             rename_map = {"category": "구분", "item_type": "품목군", "name": "규격/자재명", "price": "단가", "remark": "비고"}
             df_show = df_show.rename(columns=rename_map)
 
-            st.dataframe(df_show[["구분", "품목군", "규격/자재명", "단가", "비고"]], use_container_width=True, hide_index=True)
-        else:
-            st.info("검색된 데이터가 없습니다.")
-    else:
-        st.info("구글 시트에 등록된 데이터가 없습니다.")
-
-            # 단가표 출력
-            df_show = df_filtered.copy()
-            df_show["price"] = df_show["price_num"].apply(lambda x: f"{x:,} 원")
-            rename_map = {"category": "구분", "item_type": "품목군", "name": "규격/자재명", "price": "단가", "remark": "비고"}
-            df_show = df_show.rename(columns=rename_map)
-            
             st.dataframe(df_show[["구분", "품목군", "규격/자재명", "단가", "비고"]], use_container_width=True, hide_index=True)
         else:
             st.info("검색된 데이터가 없습니다.")
