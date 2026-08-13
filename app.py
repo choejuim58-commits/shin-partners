@@ -195,16 +195,15 @@ with tab1:
     with col_t1:
         st.subheader("🔎 자재 단가 조회 & 장바구니 담기")
     with col_t2:
-        # 3번 보완: 클릭 시 캐시를 지우고 구글 시트에서 최신 데이터를 새로 들고 옴
+        # 3번 적용: 클릭 시 캐시를 지우고 최신 데이터 새로고침
         if st.button("🔄 단가표 즉시 새로고침", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
     df_gs = get_gs_data()
-    # ... (이하 기존 검색 및 장바구니 로직 동일)
-    
+
     if not df_gs.empty:
-# 검색 폼으로 감싸서 타자 칠 때마다 재실행되는 현상 방지
+        # 1번 적용: st.form으로 엔터/검색 버튼 클릭 시에만 재실행 (로딩 최소화)
         with st.form("search_form"):
             col1, col2, col3 = st.columns([2, 3, 1])
             with col1:
@@ -220,7 +219,7 @@ with tab1:
                     key="tab1_search_kw"
                 )
             with col3:
-                st.write("") # 버튼 위치 맞춤용 여백
+                st.write("")
                 st.write("")
                 search_submitted = st.form_submit_button("🔍 검색", use_container_width=True)
 
@@ -239,36 +238,31 @@ with tab1:
             df_filtered = df_filtered[mask]
 
         if not df_filtered.empty:
-            df_filtered["price_num"] = pd.to_numeric(
-                df_filtered["price"].astype(str).str.replace("원", "").str.replace(",", "").str.strip(),
-                errors="coerce"
-            ).fillna(0).astype(int)
-
-# 상단에 장바구니 선택 박스 배치
+            # 🛒 장바구니 선택 박스
             with st.expander("🛒 선택한 품목 장바구니에 바로 담기", expanded=True):
                 c_sel, c_qty, c_btn = st.columns([3, 1, 1])
-                
-                # 💡 인덱스 꼬임 방지: pandas 행(row) 객체를 리스트로 직접 전달
+
+                # 💡 인덱스 꼬임 버그 방지: 행(dict) 자체를 다룸
                 items_list = df_filtered.to_dict('records')
-                
+
                 with c_sel:
                     def format_item_dict(item):
-                        return f"[{item['category']}] {item['item_type']} | {item['name']} ({item['price_num']:,}원)"
-                    
-                    # index(숫자) 대신 dict 객체 자체를 selected_item으로 받음
+                        # price_num을 바로 사용
+                        price_val = item.get('price_num', 0)
+                        return f"[{item['category']}] {item['item_type']} | {item['name']} ({price_val:,}원)"
+
                     selected_item = st.selectbox(
-                        "담을 품목 선택", 
-                        options=items_list, 
-                        format_func=format_item_dict, 
+                        "담을 품목 선택",
+                        options=items_list,
+                        format_func=format_item_dict,
                         label_visibility="collapsed"
                     )
-                
+
                 with c_qty:
                     add_qty = st.number_input("수량", min_value=1, value=1, step=1, label_visibility="collapsed")
-                
+
                 with c_btn:
                     if st.button("🛒 담기", type="primary", use_container_width=True):
-                        # selected_item이 선택된 행의 진짜 데이터(dict)이므로 절대 안 꼬임!
                         exists = False
                         for c in st.session_state.cart:
                             if c["category"] == selected_item["category"] and c["name"] == selected_item["name"]:
@@ -280,18 +274,18 @@ with tab1:
                                 "category": selected_item["category"],
                                 "item_type": selected_item["item_type"],
                                 "name": selected_item["name"],
-                                "price": selected_item["price_num"],
+                                "price": selected_item.get("price_num", 0),
                                 "qty": add_qty
                             })
                         st.toast(f"✅ '{selected_item['name']}' {add_qty}개가 장바구니에 담겼습니다!", icon="🛒")
                         st.rerun()
 
-            # 단가표 출력
+            # 📋 화면 출력용 데이터프레임 정리
             df_show = df_filtered.copy()
             df_show["price"] = df_show["price_num"].apply(lambda x: f"{x:,} 원")
             rename_map = {"category": "구분", "item_type": "품목군", "name": "규격/자재명", "price": "단가", "remark": "비고"}
             df_show = df_show.rename(columns=rename_map)
-            
+
             st.dataframe(df_show[["구분", "품목군", "규격/자재명", "단가", "비고"]], use_container_width=True, hide_index=True)
         else:
             st.info("검색된 데이터가 없습니다.")
