@@ -221,7 +221,7 @@ with tab1:
             with st.expander("🛒 선택한 품목 장바구니에 바로 담기", expanded=True):
                 c_sel, c_qty, c_btn = st.columns([3, 1, 1])
 
-                # 💡 문자열 Key 리스트 생성으로 Selectbox 오류 방지
+                # 드롭다운 표시용 문구 (구분 | 품목군 | 규격)
                 df_filtered["select_key"] = (
                     df_filtered["category"].astype(str) + " | " +
                     df_filtered["item_type"].astype(str) + " | " +
@@ -250,10 +250,12 @@ with tab1:
                         target_name = str(target_row["name"])
                         target_price = int(target_row["price_num"])
 
-                        # 장바구니 수량 합산 로직
+                        # 핵심 수정: 구분(category), 품목군(item_type), 규격(name) 3개가 완벽히 일치할 때만 수량 합산!
                         exists = False
                         for c in st.session_state.cart:
-                            if c["category"] == target_cat and c["name"] == target_name:
+                            if (c["category"] == target_cat and 
+                                c["item_type"] == target_type and 
+                                c["name"] == target_name):
                                 c["qty"] += add_qty
                                 exists = True
                                 break
@@ -267,7 +269,7 @@ with tab1:
                                 "qty": int(add_qty)
                             })
                             
-                        st.toast(f"✅ '{target_name}' {add_qty}개가 담겼습니다!", icon="🛒")
+                        st.toast(f"✅ '[{target_type}] {target_name}' {add_qty}개가 담겼습니다!", icon="🛒")
                         st.rerun()
 
             # 단가표 테이블 출력
