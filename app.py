@@ -183,18 +183,27 @@ with tab1:
     df_gs = get_gs_data()
 
     if not df_gs.empty:
-        # 검색 필터 영역
+        # 검색 폼
         with st.form("search_form"):
             col1, col2, col3 = st.columns([2, 3, 1])
             with col1:
-                category_filter = st.selectbox("조회할 단가표 선택", ["전체 (비교해서 보기)", "수입상 단가만", "합판상 단가만"], key="tab1_cat_select")
+                category_filter = st.selectbox(
+                    "조회할 단가표 선택",
+                    ["전체 (비교해서 보기)", "수입상 단가만", "합판상 단가만"],
+                    key="tab1_cat_select"
+                )
             with col2:
-                search_kw = st.text_input("자재명/규격 입력 후 Enter", placeholder="예: 멀바우, MDF, OSB...", key="tab1_search_kw")
+                search_kw = st.text_input(
+                    "자재명/규격 입력 후 Enter",
+                    placeholder="예: 멀바우, MDF, OSB...",
+                    key="tab1_search_kw"
+                )
             with col3:
                 st.write("")
                 st.write("")
                 search_submitted = st.form_submit_button("🔍 검색", use_container_width=True)
 
+        # 필터링 로직
         df_filtered = df_gs.copy()
         if category_filter == "수입상 단가만":
             df_filtered = df_filtered[df_filtered["category"] == "수입상"]
@@ -209,25 +218,26 @@ with tab1:
             df_filtered = df_filtered[mask]
 
         if not df_filtered.empty:
-            # 💡 [핵심 해결책] 고유 식별자(ID) 부여해서 인덱스/객체 꼬임 완벽 방지
-            df_filtered = df_filtered.reset_index(drop=True)
-            df_filtered['item_id'] = df_filtered.index
-
+            # 🛒 장바구니 선택 영역
             with st.expander("🛒 선택한 품목 장바구니에 바로 담기", expanded=True):
                 c_sel, c_qty, c_btn = st.columns([3, 1, 1])
 
-                with c_sel:
-                    # ID를 오퍼션으로 전달
-                    id_list = df_filtered['item_id'].tolist()
-                    
-                    def format_by_id(item_id):
-                        row = df_filtered.loc[item_id]
-                        return f"[{row['category']}] {row['item_type']} | {row['name']} ({row['price_num']:,}원)"
+                # 💡 [핵심 해결책] 문자열 Key 리스트를 만들어 Selectbox 꼬임 현상 완벽 방지
+                # 형식: "구분|품목군|자재명|단가"
+                df_filtered["select_key"] = (
+                    df_filtered["category"].astype(str) + " | " +
+                    df_filtered["item_type"].astype(str) + " | " +
+                    df_filtered["name"].astype(str) + " (" +
+                    df_filtered["price_num"].apply(lambda x: f"{x:,}") + "원)"
+                )
+                
+                # 중복 키 방지 및 매핑용 딕셔너리 생성
+                item_options = df_filtered["select_key"].tolist()
 
-                    selected_id = st.selectbox(
+                with c_sel:
+                    selected_key = st.selectbox(
                         "담을 품목 선택",
-                        options=id_list,
-                        format_func=format_by_id,
+                        options=item_options,
                         label_visibility="collapsed"
                     )
 
@@ -236,24 +246,45 @@ with tab1:
 
                 with c_btn:
                     if st.button("🛒 담기", type="primary", use_container_width=True):
-                        selected_row = df_filtered.loc[selected_id]
+                        # 선택된 문자열 Key로 해당 행(Row) 정밀 검색
+                        target_row = df_filtered[df_filtered["select_key"] == selected_key].iloc[0]
                         
+                        target_cat = str(target_row["category"])
+                        target_type = str(target_row["item_type"])
+                        target_name = str(target_row["name"])
+                        target_price = int(target_row["price_num"])
+
+                        # 장바구니 수량 합산 로직
                         exists = False
                         for c in st.session_state.cart:
-                            if c["category"] == selected_row["category"] and c["name"] == selected_row["name"]:
+                            if c["category"] == target_cat and c["name"] == target_name:
                                 c["qty"] += add_qty
                                 exists = True
                                 break
+                        
                         if not exists:
                             st.session_state.cart.append({
-                                "category": selected_row["category"],
-                                "item_type": selected_row["item_type"],
-                                "name": selected_row["name"],
-                                "price": int(selected_row["price_num"]),
+                                "category": target_cat,
+                                "item_type": target_type,
+                                "name": target_name,
+                                "price": target_price,
                                 "qty": int(add_qty)
                             })
-                        st.toast(f"✅ '{selected_row['name']}' {add_qty}개가 담겼습니다!", icon="🛒")
+                            
+                        st.toast(f"✅ '{target_name}' {add_qty}개가 담겼습니다! (현재 장바구니 총 수량 확인하세요)", icon="🛒")
                         st.rerun()
+
+            # 단가표 테이블 출력
+            df_show = df_filtered.copy()
+            df_show["price"] = df_show["price_num"].apply(lambda x: f"{x:,} 원")
+            rename_map = {"category": "구분", "item_type": "품목군", "name": "규격/자재명", "price": "단가", "remark": "비고"}
+            df_show = df_show.rename(columns=rename_map)
+
+            st.dataframe(df_show[["구분", "품목군", "규격/자재명", "단가", "비고"]], use_container_width=True, hide_index=True)
+        else:
+            st.info("검색된 데이터가 없습니다.")
+    else:
+        st.info("구글 시트에 등록된 데이터가 없습니다.")
 
             # 단가표 출력
             df_show = df_filtered.copy()
