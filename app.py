@@ -170,7 +170,7 @@ with tab0:
         if not df_building.empty:
             st.dataframe(df_building.style.pipe(apply_excel_style), use_container_width=True, hide_index=True)
 
-# --- [탭 1] 단가 검색 및 담기 (버그 완전 수정!) ---
+# --- [탭 1] 단가 검색 및 담기 (버그 완전 수정 & 인덴트 오류 해결!) ---
 with tab1:
     col_t1, col_t2 = st.columns([3, 1])
     with col_t1:
@@ -223,7 +223,7 @@ with tab1:
                 c_sel, c_qty, c_btn = st.columns([3, 1, 1])
 
                 # 💡 [핵심 해결책] 문자열 Key 리스트를 만들어 Selectbox 꼬임 현상 완벽 방지
-                # 형식: "구분|품목군|자재명|단가"
+                # 형식: "구분 | 품목군 | 자재명 (단가원)"
                 df_filtered["select_key"] = (
                     df_filtered["category"].astype(str) + " | " +
                     df_filtered["item_type"].astype(str) + " | " +
@@ -231,7 +231,6 @@ with tab1:
                     df_filtered["price_num"].apply(lambda x: f"{x:,}") + "원)"
                 )
                 
-                # 중복 키 방지 및 매핑용 딕셔너리 생성
                 item_options = df_filtered["select_key"].tolist()
 
                 with c_sel:
@@ -271,7 +270,7 @@ with tab1:
                                 "qty": int(add_qty)
                             })
                             
-                        st.toast(f"✅ '{target_name}' {add_qty}개가 담겼습니다! (현재 장바구니 총 수량 확인하세요)", icon="🛒")
+                        st.toast(f"✅ '{target_name}' {add_qty}개가 담겼습니다!", icon="🛒")
                         st.rerun()
 
             # 단가표 테이블 출력
