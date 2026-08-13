@@ -244,39 +244,46 @@ with tab1:
                 errors="coerce"
             ).fillna(0).astype(int)
 
-            # 상단에 장바구니 선택 박스 배치
+# 상단에 장바구니 선택 박스 배치
             with st.expander("🛒 선택한 품목 장바구니에 바로 담기", expanded=True):
                 c_sel, c_qty, c_btn = st.columns([3, 1, 1])
                 
+                # 💡 인덱스 꼬임 방지: pandas 행(row) 객체를 리스트로 직접 전달
+                items_list = df_filtered.to_dict('records')
+                
                 with c_sel:
-                    item_options = df_filtered.index.tolist()
-                    def format_item(idx):
-                        row = df_filtered.loc[idx]
-                        return f"[{row['category']}] {row['item_type']} | {row['name']} ({row['price_num']:,}원)"
+                    def format_item_dict(item):
+                        return f"[{item['category']}] {item['item_type']} | {item['name']} ({item['price_num']:,}원)"
                     
-                    selected_idx = st.selectbox("담을 품목 선택", options=item_options, format_func=format_item, label_visibility="collapsed")
+                    # index(숫자) 대신 dict 객체 자체를 selected_item으로 받음
+                    selected_item = st.selectbox(
+                        "담을 품목 선택", 
+                        options=items_list, 
+                        format_func=format_item_dict, 
+                        label_visibility="collapsed"
+                    )
                 
                 with c_qty:
                     add_qty = st.number_input("수량", min_value=1, value=1, step=1, label_visibility="collapsed")
                 
                 with c_btn:
                     if st.button("🛒 담기", type="primary", use_container_width=True):
-                        target_row = df_filtered.loc[selected_idx]
+                        # selected_item이 선택된 행의 진짜 데이터(dict)이므로 절대 안 꼬임!
                         exists = False
                         for c in st.session_state.cart:
-                            if c["category"] == target_row["category"] and c["name"] == target_row["name"]:
+                            if c["category"] == selected_item["category"] and c["name"] == selected_item["name"]:
                                 c["qty"] += add_qty
                                 exists = True
                                 break
                         if not exists:
                             st.session_state.cart.append({
-                                "category": target_row["category"],
-                                "item_type": target_row["item_type"],
-                                "name": target_row["name"],
-                                "price": target_row["price_num"],
+                                "category": selected_item["category"],
+                                "item_type": selected_item["item_type"],
+                                "name": selected_item["name"],
+                                "price": selected_item["price_num"],
                                 "qty": add_qty
                             })
-                        st.toast(f"✅ '{target_row['name']}' {add_qty}개가 장바구니에 담겼습니다!", icon="🛒")
+                        st.toast(f"✅ '{selected_item['name']}' {add_qty}개가 장바구니에 담겼습니다!", icon="🛒")
                         st.rerun()
 
             # 단가표 출력
