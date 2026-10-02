@@ -45,7 +45,7 @@ URL_PANEL = "https://1drv.ms/x/c/e159fcf2d96e4b60/IQD9uLWkE5c7QYgaIwIL_YOgAfq_SO
 URL_BUILDING = "https://1drv.ms/x/c/e159fcf2d96e4b60/IQBMeXt0XDmHT4f-A042xKnQAVl576fJOGz2wN8KgN3hd5Q?e=6X3Y1o"
 
 @st.cache_data(ttl=43200)
-def load_onedrive_excel(url, category_name, target_sheet="2026.9"):
+def load_onedrive_excel(url, category_name, target_sheet="2026.10"):
     try:
         download_url = url + "&download=1" if "?" in url else url + "?download=1"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
@@ -149,9 +149,9 @@ with tab0:
             st.rerun()
 
     with st.spinner("원드라이브 데이터 로딩 중..."):
-        # 📌 2026.9 시트로 업데이트
-        df_panel = load_onedrive_excel(URL_PANEL, "판재류", target_sheet="2026.9")
-        df_building = load_onedrive_excel(URL_BUILDING, "건축자재", target_sheet="2026.9")
+        # 📌 2026.10 시트로 업데이트
+        df_panel = load_onedrive_excel(URL_PANEL, "판재류", target_sheet="2026.10")
+        df_building = load_onedrive_excel(URL_BUILDING, "건축자재", target_sheet="2026.10")
         df_onedrive_all = pd.concat([df_panel, df_building], ignore_index=True).fillna("")
 
     sub_tab1, sub_tab2, sub_tab3 = st.tabs(["전체 보기", "🪵 판재류", "🏗️ 건축자재"])
