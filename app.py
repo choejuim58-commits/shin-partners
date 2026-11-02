@@ -151,7 +151,7 @@ with tab0:
     with st.spinner("원드라이브 데이터 로딩 중..."):
         # 📌 2026.11 시트로 업데이트
         df_panel = load_onedrive_excel(URL_PANEL, "판재류", target_sheet="2026.11")
-        df_building = load_onedrive_excel(URL_BUILDING, "건축자재", target_sheet="2026.10")
+        df_building = load_onedrive_excel(URL_BUILDING, "건축자재", target_sheet="2026.11")
         df_onedrive_all = pd.concat([df_panel, df_building], ignore_index=True).fillna("")
 
     sub_tab1, sub_tab2, sub_tab3 = st.tabs(["전체 보기", "🪵 판재류", "🏗️ 건축자재"])
